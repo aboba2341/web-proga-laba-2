@@ -18,6 +18,10 @@ let tasks = [];
 // появления только у неё, а не у всего списка.
 let justAddedId = null;
 
+// То же для только что завершённой задачи: «перо» зачёркивает
+// строку только у неё, а не у всех завершённых при каждой перерисовке.
+let justCompletedId = null;
+
 // ===== Утилиты =====
 
 // Создаёт элемент: тег, класс, текст, атрибуты и вложенные элементы.
@@ -299,26 +303,46 @@ function createTaskElement(task) {
   // Срок прошёл — помечаем, чтобы писатель видел просроченные клятвы.
   // Строки 'ГГГГ-ММ-ДД' можно сравнивать напрямую, как текст:
   // порядок символов совпадает с порядком дат.
-  const isOverdue = task.date < getTodayString();
+  // У завершённой задачи срок уже не важен.
+  const isOverdue = !task.done && task.date < getTodayString();
 
-  if (isOverdue) {
-    item.classList.add('task--overdue');
-  }
-  if (task.id === justAddedId) {
-    item.classList.add('task--new');
-  }
+  // classList.toggle(класс, условие) добавляет класс, если условие
+  // истинно, и убирает, если ложно.
+  item.classList.toggle('task--overdue', isOverdue);
+  item.classList.toggle('task--done', task.done);
+  item.classList.toggle('task--new', task.id === justAddedId);
+  item.classList.toggle('task--just-done', task.id === justCompletedId);
 
-  const title = createElement('p', {
-    className: 'task__title',
+  const checkbox = createElement('input', {
+    className: 'task__check',
+    attrs: {
+      type: 'checkbox',
+      'data-action': 'toggle',
+      'aria-label': `Отметить запись «${task.title}» завершённой`,
+    },
+  });
+  // checked — свойство, а не атрибут: оно отражает текущее состояние.
+  checkbox.checked = task.done;
+
+  // Текст в <span>: линия зачёркивания рисуется фоном строки
+  // и должна идти по каждой строке текста, а не по всему блоку.
+  const titleText = createElement('span', {
+    className: 'task__title-text',
     text: task.title,
   });
+  const title = createElement('p', { className: 'task__title' }, [titleText]);
+
+  let dateText = `До ${formatDate(task.date)}`;
+  if (task.done) {
+    dateText = `Завершено · срок был ${formatDate(task.date)}`;
+  } else if (isOverdue) {
+    dateText = `Срок минул: ${formatDate(task.date)}`;
+  }
 
   // <time> — семантический тег для дат; в datetime — машинный формат.
   const date = createElement('time', {
     className: 'task__date',
-    text: isOverdue
-      ? `Срок минул: ${formatDate(task.date)}`
-      : `До ${formatDate(task.date)}`,
+    text: dateText,
     attrs: { datetime: task.date },
   });
 
@@ -339,7 +363,7 @@ function createTaskElement(task) {
 
   const actions = createElement('div', { className: 'task__actions' }, [deleteButton]);
 
-  item.append(body, actions);
+  item.append(checkbox, body, actions);
   return item;
 }
 
@@ -349,10 +373,15 @@ function render() {
 
   ui.emptyState.hidden = tasks.length > 0;
 
+  const doneCount = tasks.filter((task) => task.done).length;
   const word = pluralize(tasks.length, 'запись', 'записи', 'записей');
-  ui.counter.textContent = tasks.length > 0 ? `${tasks.length} ${word}` : '';
+
+  ui.counter.textContent = tasks.length > 0
+    ? `${tasks.length} ${word} · завершено ${doneCount}`
+    : '';
 
   justAddedId = null;
+  justCompletedId = null;
 }
 
 // ===== Действия =====
@@ -373,6 +402,14 @@ function addTask(title, date) {
 function deleteTask(id) {
   // filter возвращает новый массив без удаляемой задачи
   tasks = tasks.filter((task) => task.id !== id);
+  render();
+}
+
+function toggleTask(id) {
+  const task = tasks.find((item) => item.id === id);
+
+  task.done = !task.done;
+  justCompletedId = task.done ? task.id : null;
   render();
 }
 
@@ -403,6 +440,20 @@ function handleListClick(event) {
   }
 }
 
+// Чекбокс слушаем через change: он срабатывает и от мыши,
+// и от пробела с клавиатуры. Тоже делегирование — на весь список.
+function handleListChange(event) {
+  if (event.target.dataset.action === 'toggle') {
+    const id = event.target.closest('.task').dataset.id;
+    toggleTask(id);
+
+    // render() создал новый чекбокс, а фокус остался на старом,
+    // которого уже нет. Возвращаем фокус — иначе тот, кто работает
+    // с клавиатуры, «выпадет» в начало страницы.
+    ui.taskList.querySelector(`[data-id="${id}"] .task__check`).focus();
+  }
+}
+
 function handleFormSubmit(event) {
   // Без этого браузер отправил бы форму и перезагрузил страницу.
   event.preventDefault();
@@ -427,6 +478,7 @@ function handleFormSubmit(event) {
 function bindEvents() {
   ui.form.addEventListener('submit', handleFormSubmit);
   ui.taskList.addEventListener('click', handleListClick);
+  ui.taskList.addEventListener('change', handleListChange);
 
   // Как только пользователь начал исправлять поле — снимаем ошибку.
   ui.titleInput.addEventListener('input', () => {

@@ -325,6 +325,97 @@ select.field__input {
   color: var(--color-ember);
 }
 
+/* ===== Чекбокс: своя «печать» вместо системной галочки ===== */
+.task__check {
+  appearance: none;
+  flex-shrink: 0;
+  display: grid;
+  place-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: 0;
+  background: var(--color-field);
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+/* Галочка — повёрнутый «уголок» из двух рамок */
+.task__check::after {
+  content: '';
+  width: 0.45rem;
+  height: 0.8rem;
+  margin-top: -0.15rem;
+  border: solid var(--color-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform 0.15s ease-out;
+}
+
+.task__check:hover {
+  border-color: var(--color-gold-bright);
+}
+
+.task__check:checked {
+  background: var(--color-blood);
+  border-color: var(--color-blood-hover);
+}
+
+.task__check:checked::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.task__check:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
+/* ===== Завершённая запись: зачёркнута пером, чернила выцвели ===== */
+
+/* Линия рисуется фоном строки: градиент высотой 2px на уровне
+   середины букв. box-decoration-break — чтобы линия шла
+   по каждой строке, если название переносится. */
+.task__title-text {
+  background-image: linear-gradient(var(--color-blood-hover), var(--color-blood-hover));
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 0 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.task--done .task__title-text {
+  background-size: 100% 2px;
+}
+
+.task--done .task__title,
+.task--done .task__date {
+  color: var(--color-muted);
+}
+
+.task--done {
+  background: #120f0c;
+}
+
+.task--done::before {
+  background: var(--color-border);
+}
+
+/* Перо ведёт линию слева направо — только у только что отмеченной */
+.task--just-done .task__title-text {
+  animation: strike 0.45s ease-out;
+}
+
+@keyframes strike {
+  from {
+    background-size: 0 2px;
+  }
+  to {
+    background-size: 100% 2px;
+  }
+}
+
 /* ===== Кнопки внутри карточки ===== */
 .task__actions {
   display: flex;
@@ -476,10 +567,20 @@ select.field__input {
   /* Кнопки карточки уходят под текст */
   .task {
     flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .task__check {
+    margin-top: 0.1rem; /* на уровне первой строки названия */
   }
 
   .task__body {
-    flex-basis: 100%;
+    flex: 1 1 calc(100% - 3rem); /* текст рядом с чекбоксом */
+  }
+
+  .task__actions {
+    width: 100%;
+    padding-left: 2.6rem; /* кнопки выровнены по тексту, а не по чекбоксу */
   }
 }
 
