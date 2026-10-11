@@ -324,7 +324,22 @@ function createTaskElement(task) {
 
   const body = createElement('div', { className: 'task__body' }, [title, date]);
 
-  item.append(body);
+  // data-action говорит общему обработчику кликов, что делать.
+  // aria-label — чтобы экранный диктор прочитал не просто «Сжечь»,
+  // а какую именно запись.
+  const deleteButton = createElement('button', {
+    className: 'task__button task__button--danger',
+    text: 'Сжечь',
+    attrs: {
+      type: 'button',
+      'data-action': 'delete',
+      'aria-label': `Удалить запись «${task.title}»`,
+    },
+  });
+
+  const actions = createElement('div', { className: 'task__actions' }, [deleteButton]);
+
+  item.append(body, actions);
   return item;
 }
 
@@ -355,6 +370,39 @@ function addTask(title, date) {
   render();
 }
 
+function deleteTask(id) {
+  // filter возвращает новый массив без удаляемой задачи
+  tasks = tasks.filter((task) => task.id !== id);
+  render();
+}
+
+// Сначала проигрываем анимацию «сгорания», потом удаляем из данных.
+function burnTask(item) {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduceMotion) {
+    deleteTask(item.dataset.id);
+    return;
+  }
+
+  item.classList.add('task--burning');
+  item.addEventListener('animationend', () => deleteTask(item.dataset.id), { once: true });
+}
+
+// Один обработчик на весь список (делегирование событий).
+// Клик по любой кнопке внутри <ul> «всплывает» до самого <ul>,
+// а по data-action мы понимаем, какая кнопка нажата.
+function handleListClick(event) {
+  const button = event.target.closest('[data-action]');
+  if (!button) return;
+
+  const item = button.closest('.task');
+
+  if (button.dataset.action === 'delete') {
+    burnTask(item);
+  }
+}
+
 function handleFormSubmit(event) {
   // Без этого браузер отправил бы форму и перезагрузил страницу.
   event.preventDefault();
@@ -378,6 +426,7 @@ function handleFormSubmit(event) {
 
 function bindEvents() {
   ui.form.addEventListener('submit', handleFormSubmit);
+  ui.taskList.addEventListener('click', handleListClick);
 
   // Как только пользователь начал исправлять поле — снимаем ошибку.
   ui.titleInput.addEventListener('input', () => {
