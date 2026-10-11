@@ -7,6 +7,17 @@
 // (форма, поля, список). Заполняются при сборке страницы.
 const ui = {};
 
+// ===== Состояние приложения =====
+
+// Все задачи. Порядок в массиве = «свой порядок» пользователя.
+// Задача выглядит так:
+// { id: 'lq3x9k2f', title: 'Глава XII', date: '2026-10-20', done: false }
+let tasks = [];
+
+// id только что добавленной задачи — чтобы проиграть анимацию
+// появления только у неё, а не у всего списка.
+let justAddedId = null;
+
 // ===== Утилиты =====
 
 // Создаёт элемент: тег, класс, текст, атрибуты и вложенные элементы.
@@ -236,6 +247,144 @@ function buildFooter() {
   ]);
 }
 
+// ===== Даты и слова =====
+
+// Сегодняшняя дата в формате поля <input type="date">: 'ГГГГ-ММ-ДД'.
+function getTodayString() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+// '2026-10-20' → «20 октября 2026».
+// Дату собираем из частей, а не через new Date('2026-10-20'):
+// такая строка читается как полночь по UTC, и в часовых поясах
+// западнее Гринвича дата съехала бы на день назад.
+function formatDate(dateString) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  // toLocaleDateString возвращает «20 октября 2026 г.» — хвост « г.» убираем.
+  return date
+    .toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+    .replace(' г.', '');
+}
+
+// Склонение по числу: 1 запись, 3 записи, 5 записей, 11 записей.
+function pluralize(count, one, few, many) {
+  const lastTwo = count % 100;
+  const last = count % 10;
+
+  if (lastTwo >= 11 && lastTwo <= 14) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
+// Короткий уникальный id: время в миллисекундах + случайный хвост.
+function createId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// ===== Отрисовка =====
+
+// Карточка одной задачи.
+function createTaskElement(task) {
+  const item = createElement('li', {
+    className: 'task',
+    attrs: { 'data-id': task.id },
+  });
+
+  // Срок прошёл — помечаем, чтобы писатель видел просроченные клятвы.
+  // Строки 'ГГГГ-ММ-ДД' можно сравнивать напрямую, как текст:
+  // порядок символов совпадает с порядком дат.
+  const isOverdue = task.date < getTodayString();
+
+  if (isOverdue) {
+    item.classList.add('task--overdue');
+  }
+  if (task.id === justAddedId) {
+    item.classList.add('task--new');
+  }
+
+  const title = createElement('p', {
+    className: 'task__title',
+    text: task.title,
+  });
+
+  // <time> — семантический тег для дат; в datetime — машинный формат.
+  const date = createElement('time', {
+    className: 'task__date',
+    text: isOverdue
+      ? `Срок минул: ${formatDate(task.date)}`
+      : `До ${formatDate(task.date)}`,
+    attrs: { datetime: task.date },
+  });
+
+  const body = createElement('div', { className: 'task__body' }, [title, date]);
+
+  item.append(body);
+  return item;
+}
+
+// Перерисовывает список целиком по массиву tasks.
+function render() {
+  ui.taskList.replaceChildren(...tasks.map(createTaskElement));
+
+  ui.emptyState.hidden = tasks.length > 0;
+
+  const word = pluralize(tasks.length, 'запись', 'записи', 'записей');
+  ui.counter.textContent = tasks.length > 0 ? `${tasks.length} ${word}` : '';
+
+  justAddedId = null;
+}
+
+// ===== Действия =====
+
+function addTask(title, date) {
+  const task = {
+    id: createId(),
+    title,
+    date,
+    done: false,
+  };
+
+  tasks.push(task);
+  justAddedId = task.id;
+  render();
+}
+
+function handleFormSubmit(event) {
+  // Без этого браузер отправил бы форму и перезагрузил страницу.
+  event.preventDefault();
+
+  const title = ui.titleInput.value.trim();
+
+  // required не спасает от строки из одних пробелов — ловим сами
+  // и показываем сообщение в том же стиле, что и встроенные.
+  if (title === '') {
+    ui.titleInput.setCustomValidity('Запись не может состоять из одних пробелов');
+    ui.titleInput.reportValidity();
+    return;
+  }
+
+  addTask(title, ui.dateInput.value);
+
+  ui.form.reset();
+  ui.dateInput.value = getTodayString();
+  ui.titleInput.focus();
+}
+
+function bindEvents() {
+  ui.form.addEventListener('submit', handleFormSubmit);
+
+  // Как только пользователь начал исправлять поле — снимаем ошибку.
+  ui.titleInput.addEventListener('input', () => {
+    ui.titleInput.setCustomValidity('');
+  });
+}
+
 // ===== Запуск =====
 
 function init() {
@@ -251,6 +400,11 @@ function init() {
   ]);
 
   document.body.append(buildHeader(), main, buildFooter());
+
+  ui.dateInput.value = getTodayString();
+
+  bindEvents();
+  render();
 }
 
 init();
