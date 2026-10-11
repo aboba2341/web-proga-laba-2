@@ -502,9 +502,16 @@ function compareByDate(a, b) {
 // Сам массив tasks не трогаем: в нём хранится «свой порядок»
 // пользователя, а сортировка — лишь способ взглянуть на него иначе.
 function getVisibleTasks() {
-  // [...tasks] — копия: sort() меняет массив, на котором вызван.
-  const visible = [...tasks];
+  const filterMode = ui.filterSelect.value;
   const sortMode = ui.sortSelect.value;
+
+  // filter() сам возвращает новый массив, так что дальнейший sort()
+  // тоже работает с копией и не трогает tasks.
+  const visible = tasks.filter((task) => {
+    if (filterMode === 'active') return !task.done;
+    if (filterMode === 'done') return task.done;
+    return true; // 'all'
+  });
 
   if (sortMode === 'date-asc') {
     visible.sort(compareByDate);
@@ -521,16 +528,29 @@ function getVisibleTasks() {
 function render() {
   saveTasks();
 
-  ui.taskList.replaceChildren(...getVisibleTasks().map(createTaskElement));
+  const visibleTasks = getVisibleTasks();
 
-  ui.emptyState.hidden = tasks.length > 0;
+  ui.taskList.replaceChildren(...visibleTasks.map(createTaskElement));
+
+  // Заглушка различает два случая: задач нет вообще —
+  // или они есть, но под текущие условия ни одна не подошла.
+  ui.emptyState.hidden = visibleTasks.length > 0;
+  ui.emptyState.textContent = tasks.length === 0
+    ? 'Летопись пуста. Начни первую главу.'
+    : 'Ни одна запись не отвечает условиям. Измени фильтр.';
 
   const doneCount = tasks.filter((task) => task.done).length;
   const word = pluralize(tasks.length, 'запись', 'записи', 'записей');
 
-  ui.counter.textContent = tasks.length > 0
-    ? `${tasks.length} ${word} · завершено ${doneCount}`
-    : '';
+  let counterText = '';
+  if (tasks.length > 0) {
+    counterText = `${tasks.length} ${word} · завершено ${doneCount}`;
+  }
+  // Если показаны не все — пишем, сколько видно.
+  if (visibleTasks.length !== tasks.length) {
+    counterText += ` · показано ${visibleTasks.length}`;
+  }
+  ui.counter.textContent = counterText;
 
   justAddedId = null;
   justCompletedId = null;
@@ -670,7 +690,9 @@ function handleListChange(event) {
     // render() создал новый чекбокс, а фокус остался на старом,
     // которого уже нет. Возвращаем фокус — иначе тот, кто работает
     // с клавиатуры, «выпадет» в начало страницы.
-    ui.taskList.querySelector(`[data-id="${id}"] .task__check`).focus();
+    // ?. — на случай, если задача скрылась под фильтром
+    // (например, отметили выполненной в режиме «В работе»).
+    ui.taskList.querySelector(`[data-id="${id}"] .task__check`)?.focus();
   }
 }
 
@@ -705,6 +727,7 @@ function bindEvents() {
 
   // Смена порядка — только перерисовка: данные не меняются.
   ui.sortSelect.addEventListener('change', render);
+  ui.filterSelect.addEventListener('change', render);
 
   // Как только пользователь начал исправлять поле — снимаем ошибку.
   ui.titleInput.addEventListener('input', () => {
