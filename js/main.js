@@ -872,7 +872,13 @@ function handlePointerUp(event) {
 }
 
 // Система отменила жест (например, пришёл звонок) — ничего не двигаем.
-function handlePointerCancel() {
+// Только для пальца! Когда начинается перетаскивание мышью,
+// браузер тоже присылает pointercancel (мышь «переходит» во власть
+// Drag and Drop API). Без этой проверки мы бы сбрасывали
+// перетаскивание мышью в ту же секунду, как оно началось.
+function handlePointerCancel(event) {
+  if (event.pointerType !== 'touch') return;
+
   if (dragState) {
     dragState.targetId = null;
     finishDrag();
