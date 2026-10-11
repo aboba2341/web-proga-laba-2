@@ -290,6 +290,46 @@ function pluralize(count, one, few, many) {
   return many;
 }
 
+// Приводим текст к виду для поиска: нижний регистр и «ё» → «е».
+// Тогда «Чёрной», «черной» и «ЧЕРНОЙ» найдут одно и то же.
+// Длина строки при этом не меняется — это важно для подсветки.
+function normalize(text) {
+  return text.toLowerCase().replaceAll('ё', 'е');
+}
+
+// Текущий поисковый запрос в нормализованном виде.
+function getSearchQuery() {
+  return normalize(ui.searchInput.value.trim());
+}
+
+// Разбивает название на куски и оборачивает совпадения в <mark>.
+// Собираем через DOM-узлы, а не через innerHTML: если в названии
+// окажется текст вроде <img onerror=...>, он останется просто текстом.
+function createHighlightedText(text, query) {
+  if (query === '') {
+    return [text];
+  }
+
+  const parts = [];
+  const normalizedText = normalize(text);
+  let position = 0;
+  let matchIndex = normalizedText.indexOf(query);
+
+  while (matchIndex !== -1) {
+    parts.push(text.slice(position, matchIndex));
+    parts.push(createElement('mark', {
+      className: 'task__match',
+      text: text.slice(matchIndex, matchIndex + query.length),
+    }));
+
+    position = matchIndex + query.length;
+    matchIndex = normalizedText.indexOf(query, position);
+  }
+
+  parts.push(text.slice(position));
+  return parts;
+}
+
 // Короткий уникальный id: время в миллисекундах + случайный хвост.
 function createId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -438,10 +478,13 @@ function createTaskElement(task) {
 
   // Текст в <span>: линия зачёркивания рисуется фоном строки
   // и должна идти по каждой строке текста, а не по всему блоку.
-  const titleText = createElement('span', {
-    className: 'task__title-text',
-    text: task.title,
-  });
+  // append умеет принимать и строки, и элементы вперемешку —
+  // так в название встают куски текста и подсвеченные <mark>.
+  const titleText = createElement(
+    'span',
+    { className: 'task__title-text' },
+    createHighlightedText(task.title, getSearchQuery()),
+  );
   const title = createElement('p', { className: 'task__title' }, [titleText]);
 
   let dateText = `До ${formatDate(task.date)}`;
@@ -504,10 +547,14 @@ function compareByDate(a, b) {
 function getVisibleTasks() {
   const filterMode = ui.filterSelect.value;
   const sortMode = ui.sortSelect.value;
+  const query = getSearchQuery();
 
   // filter() сам возвращает новый массив, так что дальнейший sort()
   // тоже работает с копией и не трогает tasks.
   const visible = tasks.filter((task) => {
+    // Поиск: название должно содержать запрос (пустой запрос — подходит всё).
+    if (!normalize(task.title).includes(query)) return false;
+
     if (filterMode === 'active') return !task.done;
     if (filterMode === 'done') return task.done;
     return true; // 'all'
@@ -537,7 +584,7 @@ function render() {
   ui.emptyState.hidden = visibleTasks.length > 0;
   ui.emptyState.textContent = tasks.length === 0
     ? 'Летопись пуста. Начни первую главу.'
-    : 'Ни одна запись не отвечает условиям. Измени фильтр.';
+    : 'Ни одна запись не отвечает условиям. Измени поиск или фильтр.';
 
   const doneCount = tasks.filter((task) => task.done).length;
   const word = pluralize(tasks.length, 'запись', 'записи', 'записей');
@@ -728,6 +775,10 @@ function bindEvents() {
   // Смена порядка — только перерисовка: данные не меняются.
   ui.sortSelect.addEventListener('change', render);
   ui.filterSelect.addEventListener('change', render);
+
+  // input срабатывает на каждый введённый или стёртый символ,
+  // включая крестик очистки в поле type="search".
+  ui.searchInput.addEventListener('input', render);
 
   // Как только пользователь начал исправлять поле — снимаем ошибку.
   ui.titleInput.addEventListener('input', () => {

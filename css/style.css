@@ -371,6 +371,14 @@ select.field__input {
   outline-offset: 2px;
 }
 
+/* Найденный кусок названия — золотом, как буквица в рукописи */
+.task__match {
+  padding: 0 0.1em;
+  color: var(--color-bg);
+  background: var(--color-gold-bright);
+  border-radius: var(--radius);
+}
+
 /* ===== Завершённая запись: зачёркнута пером, чернила выцвели ===== */
 
 /* Линия рисуется фоном строки: градиент высотой 2px на уровне
