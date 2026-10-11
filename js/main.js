@@ -492,13 +492,36 @@ function createTaskElement(task) {
   return item;
 }
 
+// Сравнение двух задач по сроку. Строки 'ГГГГ-ММ-ДД' сравниваются
+// как текст — порядок совпадает с хронологическим.
+function compareByDate(a, b) {
+  return a.date.localeCompare(b.date);
+}
+
+// Какие задачи и в каком порядке показать на экране.
+// Сам массив tasks не трогаем: в нём хранится «свой порядок»
+// пользователя, а сортировка — лишь способ взглянуть на него иначе.
+function getVisibleTasks() {
+  // [...tasks] — копия: sort() меняет массив, на котором вызван.
+  const visible = [...tasks];
+  const sortMode = ui.sortSelect.value;
+
+  if (sortMode === 'date-asc') {
+    visible.sort(compareByDate);
+  } else if (sortMode === 'date-desc') {
+    visible.sort((a, b) => compareByDate(b, a));
+  }
+
+  return visible;
+}
+
 // Перерисовывает список целиком по массиву tasks
 // и сохраняет его. Все изменения данных проходят через render(),
 // поэтому сохранение здесь не забудется ни в одном действии.
 function render() {
   saveTasks();
 
-  ui.taskList.replaceChildren(...tasks.map(createTaskElement));
+  ui.taskList.replaceChildren(...getVisibleTasks().map(createTaskElement));
 
   ui.emptyState.hidden = tasks.length > 0;
 
@@ -679,6 +702,9 @@ function bindEvents() {
   ui.taskList.addEventListener('submit', handleEditSubmit);
   ui.taskList.addEventListener('keydown', handleListKeydown);
   ui.taskList.addEventListener('input', handleListInput);
+
+  // Смена порядка — только перерисовка: данные не меняются.
+  ui.sortSelect.addEventListener('change', render);
 
   // Как только пользователь начал исправлять поле — снимаем ошибку.
   ui.titleInput.addEventListener('input', () => {
