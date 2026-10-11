@@ -295,6 +295,55 @@ function createId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+// ===== Хранение в localStorage =====
+
+// Ключ, под которым лежат задачи. Версия в конце — на случай,
+// если формат задачи когда-нибудь поменяется: старые данные
+// под старым ключом не сломают новую версию приложения.
+const STORAGE_KEY = 'chronicle.tasks.v1';
+
+// localStorage хранит только строки, поэтому массив превращаем
+// в JSON-текст. Обёрнуто в try: в приватном режиме некоторых
+// браузеров или при переполнении хранилища запись бросает ошибку,
+// и без try из-за неё сломалась бы вся перерисовка.
+function saveTasks() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  } catch (error) {
+    console.warn('Не удалось сохранить летопись:', error);
+  }
+}
+
+// Проверка, что из хранилища пришла именно задача, а не мусор
+// (например, если кто-то поправил данные руками в DevTools).
+function isValidTask(item) {
+  return item !== null
+    && typeof item === 'object'
+    && typeof item.id === 'string'
+    && typeof item.title === 'string'
+    && typeof item.date === 'string'
+    && typeof item.done === 'boolean';
+}
+
+function loadTasks() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    // При первом запуске ключа ещё нет — getItem вернёт null.
+    if (saved === null) {
+      return [];
+    }
+
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed.filter(isValidTask) : [];
+  } catch (error) {
+    // Повреждённый JSON или недоступное хранилище — начинаем с чистого листа,
+    // а не падаем с белым экраном.
+    console.warn('Не удалось прочитать летопись:', error);
+    return [];
+  }
+}
+
 // ===== Отрисовка =====
 
 // Карточка в режиме редактирования: вместо текста — форма
@@ -443,8 +492,12 @@ function createTaskElement(task) {
   return item;
 }
 
-// Перерисовывает список целиком по массиву tasks.
+// Перерисовывает список целиком по массиву tasks
+// и сохраняет его. Все изменения данных проходят через render(),
+// поэтому сохранение здесь не забудется ни в одном действии.
 function render() {
+  saveTasks();
+
   ui.taskList.replaceChildren(...tasks.map(createTaskElement));
 
   ui.emptyState.hidden = tasks.length > 0;
@@ -650,6 +703,8 @@ function init() {
   document.body.append(buildHeader(), main, buildFooter());
 
   ui.dateInput.value = getTodayString();
+
+  tasks = loadTasks();
 
   bindEvents();
   render();
