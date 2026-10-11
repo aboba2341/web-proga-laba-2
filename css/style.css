@@ -424,6 +424,83 @@ select.field__input {
   }
 }
 
+/* ===== Перетаскивание ===== */
+
+/* Ручка: шесть точек, нарисованных градиентом */
+.task__handle {
+  flex-shrink: 0;
+  align-self: stretch;
+  width: 1.5rem;
+  margin: -0.5rem 0 -0.5rem -0.5rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  color: #75624d; /* видна и без наведения — на телефоне его нет */
+  cursor: grab;
+  touch-action: none; /* палец на ручке тащит запись, а не листает страницу */
+  transition: color 0.2s;
+}
+
+.task__handle::before {
+  content: '';
+  display: block;
+  width: 10px;
+  height: 16px;
+  margin: 0 auto;
+  background-image: radial-gradient(circle, currentColor 1.5px, transparent 2px);
+  background-size: 5px 5px;
+}
+
+.task:hover .task__handle,
+.task__handle:focus-visible {
+  color: var(--color-gold);
+}
+
+.task__handle:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: -2px;
+}
+
+.task[draggable='true'] {
+  cursor: grab;
+}
+
+/* Карточка, которую тащат, остаётся на месте блёклым «следом» */
+.task--dragging {
+  opacity: 0.4;
+  border-style: dashed;
+  border-color: var(--color-gold);
+}
+
+/* Золотая линия — место, куда упадёт запись (посередине зазора) */
+.task--drop-before::after,
+.task--drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-gold-bright);
+  border-radius: 2px;
+  box-shadow: 0 0 0.75rem rgba(216, 184, 120, 0.7);
+  pointer-events: none;
+}
+
+.task--drop-before::after {
+  top: calc(-0.375rem - 2px);
+}
+
+.task--drop-after::after {
+  bottom: calc(-0.375rem - 2px);
+}
+
+.chronicle__hint {
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--color-muted);
+}
+
 /* ===== Кнопки внутри карточки ===== */
 .task__actions {
   display: flex;
@@ -625,12 +702,18 @@ select.field__input {
   }
 
   .task__body {
-    flex: 1 1 calc(100% - 3rem); /* текст рядом с чекбоксом */
+    flex: 1 1 0; /* текст рядом с ручкой и чекбоксом */
   }
 
   .task__actions {
     width: 100%;
-    padding-left: 2.6rem; /* кнопки выровнены по тексту, а не по чекбоксу */
+    justify-content: flex-end;
+  }
+
+  .task__handle {
+    align-self: flex-start;
+    height: 2.75rem; /* удобная цель для пальца */
+    margin-top: -0.5rem;
   }
 }
 

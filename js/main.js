@@ -26,6 +26,11 @@ let justCompletedId = null;
 // Редактировать можно одну задачу за раз.
 let editingId = null;
 
+// Текущее перетаскивание: какую задачу тащим и куда собираемся
+// положить (перед какой задачей или после неё). null — ничего не тащим.
+// { id: 'lq3x9k2f', targetId: 'lq3xa1b0', position: 'before' | 'after' }
+let dragState = null;
+
 // ===== Утилиты =====
 
 // Создаёт элемент: тег, класс, текст, атрибуты и вложенные элементы.
@@ -224,6 +229,12 @@ function buildChronicleSection() {
 
   ui.taskList = createElement('ul', { className: 'task-list' });
 
+  // Подсказка, почему нельзя перетаскивать при сортировке по сроку.
+  ui.dragHint = createElement('p', {
+    className: 'chronicle__hint',
+    text: 'Перетаскивать записи можно в режиме «Свой порядок».',
+  });
+
   ui.emptyState = createElement('p', {
     className: 'chronicle__empty',
     text: 'Летопись пуста. Начни первую главу.',
@@ -241,6 +252,7 @@ function buildChronicleSection() {
       }),
       ui.counter,
     ]),
+    ui.dragHint,
     ui.taskList,
     ui.emptyState,
   ]);
@@ -452,6 +464,11 @@ function createTaskElement(task) {
     attrs: { 'data-id': task.id },
   });
 
+  // Перетаскивать можно только в «своём порядке»: при сортировке
+  // по сроку место задачи определяет дата, а не пользователь.
+  const canReorder = isManualOrder();
+  item.draggable = canReorder;
+
   // Срок прошёл — помечаем, чтобы писатель видел просроченные клятвы.
   // Строки 'ГГГГ-ММ-ДД' можно сравнивать напрямую, как текст:
   // порядок символов совпадает с порядком дат.
@@ -531,6 +548,21 @@ function createTaskElement(task) {
     deleteButton,
   ]);
 
+  if (canReorder) {
+    // Ручка: подсказывает, что карточку можно тащить, работает
+    // пальцем на телефоне и стрелками ↑ ↓ с клавиатуры.
+    const handle = createElement('button', {
+      className: 'task__handle',
+      attrs: {
+        type: 'button',
+        'data-action': 'drag',
+        'aria-label': `Переместить запись «${task.title}». Стрелки вверх и вниз`,
+        title: 'Перетащи, чтобы изменить порядок',
+      },
+    });
+    item.append(handle);
+  }
+
   item.append(checkbox, body, actions);
   return item;
 }
@@ -539,6 +571,10 @@ function createTaskElement(task) {
 // как текст — порядок совпадает с хронологическим.
 function compareByDate(a, b) {
   return a.date.localeCompare(b.date);
+}
+
+function isManualOrder() {
+  return ui.sortSelect.value === 'manual';
 }
 
 // Какие задачи и в каком порядке показать на экране.
@@ -578,6 +614,8 @@ function render() {
   const visibleTasks = getVisibleTasks();
 
   ui.taskList.replaceChildren(...visibleTasks.map(createTaskElement));
+
+  ui.dragHint.hidden = isManualOrder() || visibleTasks.length < 2;
 
   // Заглушка различает два случая: задач нет вообще —
   // или они есть, но под текущие условия ни одна не подошла.
@@ -681,10 +719,14 @@ function handleEditSubmit(event) {
 }
 
 // Esc в форме правки — отмена без сохранения.
+// Стрелки на ручке — перемещение записи.
 function handleListKeydown(event) {
   if (event.key === 'Escape' && editingId !== null) {
     stopEditing();
+    return;
   }
+
+  handleHandleKeydown(event);
 }
 
 // Сбрасываем свою ошибку, как только пользователь начал исправлять поле.
@@ -692,6 +734,170 @@ function handleListInput(event) {
   if (event.target.name === 'title') {
     event.target.setCustomValidity('');
   }
+}
+
+// ===== Перетаскивание =====
+
+// Переставляет задачу id перед задачей targetId или после неё.
+// Работаем с самим массивом tasks — это и есть «свой порядок».
+// Ориентир — соседняя задача, а не номер позиции: так перестановка
+// верна, даже если часть задач скрыта фильтром или поиском.
+function moveTask(id, targetId, position) {
+  if (id === targetId) return;
+
+  const fromIndex = tasks.findIndex((task) => task.id === id);
+  const [task] = tasks.splice(fromIndex, 1); // вынули задачу
+
+  let toIndex = tasks.findIndex((item) => item.id === targetId);
+  if (position === 'after') {
+    toIndex += 1;
+  }
+
+  tasks.splice(toIndex, 0, task); // вставили на новое место
+  render();
+}
+
+// Убирает все визуальные следы перетаскивания.
+function clearDropIndicators() {
+  for (const item of ui.taskList.querySelectorAll('.task')) {
+    item.classList.remove('task--drop-before', 'task--drop-after');
+  }
+}
+
+// Над какой карточкой курсор (или палец) и в какой её половине:
+// верхняя половина — кладём перед ней, нижняя — после.
+// Показываем золотую линию там, куда упадёт задача.
+function updateDropTarget(targetItem, clientY) {
+  clearDropIndicators();
+
+  if (!targetItem || targetItem.dataset.id === dragState.id) {
+    dragState.targetId = null;
+    return;
+  }
+
+  const rect = targetItem.getBoundingClientRect();
+  const position = clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+
+  dragState.targetId = targetItem.dataset.id;
+  dragState.position = position;
+  targetItem.classList.add(`task--drop-${position}`);
+}
+
+// Завершает перетаскивание: переставляет задачу, если есть куда.
+function finishDrag() {
+  if (!dragState) return;
+
+  const { id, targetId, position } = dragState;
+  dragState = null;
+
+  if (targetId) {
+    moveTask(id, targetId, position); // внутри — render()
+  } else {
+    render(); // просто убрать следы перетаскивания
+  }
+}
+
+// --- Мышь: HTML Drag and Drop API ---
+
+function handleDragStart(event) {
+  const item = event.target.closest('.task');
+  if (!item) return;
+
+  dragState = { id: item.dataset.id, targetId: null, position: null };
+
+  event.dataTransfer.effectAllowed = 'move';
+  // Firefox не начнёт перетаскивание без данных в dataTransfer.
+  event.dataTransfer.setData('text/plain', item.dataset.id);
+
+  // Класс — в следующем кадре: браузер делает «призрак» карточки
+  // в момент dragstart, и он не должен получиться полупрозрачным.
+  requestAnimationFrame(() => item.classList.add('task--dragging'));
+}
+
+function handleDragOver(event) {
+  if (!dragState) return;
+
+  // По умолчанию бросать элементы нельзя никуда.
+  // preventDefault в dragover говорит браузеру: «сюда можно».
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+
+  updateDropTarget(event.target.closest('.task'), event.clientY);
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  finishDrag();
+}
+
+// dragend приходит всегда — и после drop, и если задачу бросили
+// мимо списка или нажали Esc. Тогда просто прибираемся.
+function handleDragEnd() {
+  if (dragState) {
+    dragState.targetId = null;
+    finishDrag();
+  }
+}
+
+// --- Палец: Pointer Events ---
+// HTML Drag and Drop на сенсорных экранах почти не работает,
+// поэтому на телефоне тащим за ручку через события указателя.
+
+function handlePointerDown(event) {
+  const handle = event.target.closest('.task__handle');
+  if (!handle || event.pointerType !== 'touch') return;
+
+  const item = handle.closest('.task');
+  dragState = { id: item.dataset.id, targetId: null, position: null };
+
+  // «Захват»: все движения этого пальца приходят на ручку,
+  // даже когда палец ушёл с неё на другие карточки.
+  handle.setPointerCapture(event.pointerId);
+  item.classList.add('task--dragging');
+}
+
+function handlePointerMove(event) {
+  if (!dragState || event.pointerType !== 'touch') return;
+
+  // Что сейчас под пальцем? Сама ручка захватила события,
+  // поэтому спрашиваем у документа по координатам.
+  const element = document.elementFromPoint(event.clientX, event.clientY);
+  updateDropTarget(element?.closest('.task'), event.clientY);
+}
+
+function handlePointerUp(event) {
+  if (event.pointerType === 'touch') {
+    finishDrag();
+  }
+}
+
+// Система отменила жест (например, пришёл звонок) — ничего не двигаем.
+function handlePointerCancel() {
+  if (dragState) {
+    dragState.targetId = null;
+    finishDrag();
+  }
+}
+
+// --- Клавиатура: стрелки на ручке ---
+
+function handleHandleKeydown(event) {
+  const handle = event.target.closest('.task__handle');
+  if (!handle || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+
+  event.preventDefault(); // чтобы страница не прокручивалась
+
+  const item = handle.closest('.task');
+  const neighbour = event.key === 'ArrowUp'
+    ? item.previousElementSibling
+    : item.nextElementSibling;
+
+  if (!neighbour) return; // уже первая или последняя
+
+  const id = item.dataset.id;
+  moveTask(id, neighbour.dataset.id, event.key === 'ArrowUp' ? 'before' : 'after');
+
+  ui.taskList.querySelector(`[data-id="${id}"] .task__handle`)?.focus();
 }
 
 // Сначала проигрываем анимацию «сгорания», потом удаляем из данных.
@@ -771,6 +977,18 @@ function bindEvents() {
   ui.taskList.addEventListener('submit', handleEditSubmit);
   ui.taskList.addEventListener('keydown', handleListKeydown);
   ui.taskList.addEventListener('input', handleListInput);
+
+  // Перетаскивание мышью
+  ui.taskList.addEventListener('dragstart', handleDragStart);
+  ui.taskList.addEventListener('dragover', handleDragOver);
+  ui.taskList.addEventListener('drop', handleDrop);
+  ui.taskList.addEventListener('dragend', handleDragEnd);
+
+  // Перетаскивание пальцем
+  ui.taskList.addEventListener('pointerdown', handlePointerDown);
+  ui.taskList.addEventListener('pointermove', handlePointerMove);
+  ui.taskList.addEventListener('pointerup', handlePointerUp);
+  ui.taskList.addEventListener('pointercancel', handlePointerCancel);
 
   // Смена порядка — только перерисовка: данные не меняются.
   ui.sortSelect.addEventListener('change', render);
