@@ -453,6 +453,35 @@ select.field__input {
   outline-offset: 2px;
 }
 
+/* ===== Режим правки ===== */
+.task--editing {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 1px rgba(184, 148, 90, 0.25), 0 0.75rem 1.5rem rgba(0, 0, 0, 0.45);
+}
+
+.task--editing::before {
+  background: var(--color-gold);
+}
+
+/* Та же сетка, что у формы создания: название | срок | кнопки */
+.task__edit-form {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 11rem auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.task__edit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Кнопка «Отмена» по высоте равна полям ввода */
+.task__edit-actions .task__button {
+  min-height: 2.75rem;
+}
+
 /* Удаление: запись вспыхивает и истлевает */
 .task--burning {
   animation: burn 0.5s ease-in forwards;
@@ -538,6 +567,14 @@ select.field__input {
   .panel--controls .field:first-child {
     grid-column: 1 / -1;
   }
+
+  .task__edit-form {
+    grid-template-columns: 1fr auto;
+  }
+
+  .task__edit-form .field:first-child {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Телефон: всё в одну колонку, кнопка во всю ширину под палец */
@@ -555,8 +592,13 @@ select.field__input {
   }
 
   .task-form,
-  .panel--controls {
+  .panel--controls,
+  .task__edit-form {
     grid-template-columns: 1fr;
+  }
+
+  .task__edit-actions .button {
+    flex: 1;
   }
 
   .chronicle__head {

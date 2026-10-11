@@ -22,6 +22,10 @@ let justAddedId = null;
 // строку только у неё, а не у всех завершённых при каждой перерисовке.
 let justCompletedId = null;
 
+// id задачи, которая сейчас редактируется (или null).
+// Редактировать можно одну задачу за раз.
+let editingId = null;
+
 // ===== Утилиты =====
 
 // Создаёт элемент: тег, класс, текст, атрибуты и вложенные элементы.
@@ -293,8 +297,67 @@ function createId() {
 
 // ===== Отрисовка =====
 
+// Карточка в режиме редактирования: вместо текста — форма
+// с теми же полями, что и при создании, заполненными текущими значениями.
+function createEditElement(task) {
+  const titleInput = createElement('input', {
+    className: 'field__input',
+    attrs: {
+      type: 'text',
+      id: `edit-title-${task.id}`,
+      name: 'title',
+      maxlength: '120',
+      autocomplete: 'off',
+      required: '',
+    },
+  });
+  // value — свойство, как и checked: текущее значение поля.
+  titleInput.value = task.title;
+
+  const dateInput = createElement('input', {
+    className: 'field__input',
+    attrs: {
+      type: 'date',
+      id: `edit-date-${task.id}`,
+      name: 'date',
+      required: '',
+    },
+  });
+  dateInput.value = task.date;
+
+  const saveButton = createElement('button', {
+    className: 'button button--primary',
+    text: 'Сохранить',
+    attrs: { type: 'submit' },
+  });
+
+  const cancelButton = createElement('button', {
+    className: 'task__button',
+    text: 'Отмена',
+    attrs: { type: 'button', 'data-action': 'cancel-edit' },
+  });
+
+  const form = createElement('form', {
+    className: 'task__edit-form',
+    attrs: { 'aria-label': `Правка записи «${task.title}»` },
+  }, [
+    createField('Замысел', titleInput),
+    createField('Срок', dateInput),
+    createElement('div', { className: 'task__edit-actions' }, [saveButton, cancelButton]),
+  ]);
+
+  return createElement('li', {
+    className: 'task task--editing',
+    attrs: { 'data-id': task.id },
+  }, [form]);
+}
+
 // Карточка одной задачи.
 function createTaskElement(task) {
+  if (task.id === editingId) {
+    return createEditElement(task);
+  }
+
   const item = createElement('li', {
     className: 'task',
     attrs: { 'data-id': task.id },
@@ -361,7 +424,20 @@ function createTaskElement(task) {
     },
   });
 
-  const actions = createElement('div', { className: 'task__actions' }, [deleteButton]);
+  const editButton = createElement('button', {
+    className: 'task__button',
+    text: 'Править',
+    attrs: {
+      type: 'button',
+      'data-action': 'edit',
+      'aria-label': `Править запись «${task.title}»`,
+    },
+  });
+
+  const actions = createElement('div', { className: 'task__actions' }, [
+    editButton,
+    deleteButton,
+  ]);
 
   item.append(checkbox, body, actions);
   return item;
@@ -413,6 +489,68 @@ function toggleTask(id) {
   render();
 }
 
+// Открывает форму правки и ставит курсор в название.
+function startEditing(id) {
+  editingId = id;
+  render();
+
+  const input = ui.taskList.querySelector(`[data-id="${id}"] input[name="title"]`);
+  input.focus();
+  input.select(); // выделяем текст: можно сразу печатать новый
+}
+
+// Закрывает форму правки и возвращает фокус на кнопку «Править».
+function stopEditing() {
+  const id = editingId;
+  editingId = null;
+  render();
+
+  const editButton = ui.taskList.querySelector(`[data-id="${id}"] [data-action="edit"]`);
+  if (editButton) {
+    editButton.focus();
+  }
+}
+
+function updateTask(id, title, date) {
+  const task = tasks.find((item) => item.id === id);
+
+  task.title = title;
+  task.date = date;
+}
+
+// Сохранение правки. Событие submit тоже всплывает,
+// поэтому ловим его на всём списке, как клики.
+function handleEditSubmit(event) {
+  event.preventDefault();
+
+  const form = event.target;
+  const titleInput = form.elements.title;
+  const title = titleInput.value.trim();
+
+  if (title === '') {
+    titleInput.setCustomValidity('Запись не может состоять из одних пробелов');
+    titleInput.reportValidity();
+    return;
+  }
+
+  updateTask(editingId, title, form.elements.date.value);
+  stopEditing();
+}
+
+// Esc в форме правки — отмена без сохранения.
+function handleListKeydown(event) {
+  if (event.key === 'Escape' && editingId !== null) {
+    stopEditing();
+  }
+}
+
+// Сбрасываем свою ошибку, как только пользователь начал исправлять поле.
+function handleListInput(event) {
+  if (event.target.name === 'title') {
+    event.target.setCustomValidity('');
+  }
+}
+
 // Сначала проигрываем анимацию «сгорания», потом удаляем из данных.
 function burnTask(item) {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -435,8 +573,14 @@ function handleListClick(event) {
 
   const item = button.closest('.task');
 
-  if (button.dataset.action === 'delete') {
+  const action = button.dataset.action;
+
+  if (action === 'delete') {
     burnTask(item);
+  } else if (action === 'edit') {
+    startEditing(item.dataset.id);
+  } else if (action === 'cancel-edit') {
+    stopEditing();
   }
 }
 
@@ -479,6 +623,9 @@ function bindEvents() {
   ui.form.addEventListener('submit', handleFormSubmit);
   ui.taskList.addEventListener('click', handleListClick);
   ui.taskList.addEventListener('change', handleListChange);
+  ui.taskList.addEventListener('submit', handleEditSubmit);
+  ui.taskList.addEventListener('keydown', handleListKeydown);
+  ui.taskList.addEventListener('input', handleListInput);
 
   // Как только пользователь начал исправлять поле — снимаем ошибку.
   ui.titleInput.addEventListener('input', () => {
