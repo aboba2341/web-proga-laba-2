@@ -1,1 +1,361 @@
 /* Летопись замыслов — стили. Подключаются из js/main.js */
+
+/* ===== Переменные: палитра и шрифты ===== */
+:root {
+  --color-bg: #0e0c0b;          /* почти чёрный, тёплый — старая кожа */
+  --color-panel: #17130f;       /* панели чуть светлее фона */
+  --color-field: #0b0908;       /* поля ввода — «вдавлены» в панель */
+  --color-border: #3a2f25;      /* тусклая бронза */
+  --color-gold: #b8945a;        /* потускневшее золото: рамки, акценты */
+  --color-gold-bright: #d8b878;
+  --color-text: #e8dcc4;        /* пергамент */
+  --color-muted: #a8998a;       /* выцветшие чернила */
+  --color-blood: #8b1e1e;       /* запёкшаяся кровь: главные кнопки */
+  --color-blood-hover: #a52a24;
+  --color-ember: #e0705c;       /* тлеющий уголь: предупреждения */
+
+  --font-display: 'Ruslan Display', 'Cormorant Garamond', serif;
+  --font-heading: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'EB Garamond', Georgia, serif;
+
+  --radius: 2px;
+  --space: 1.5rem;
+}
+
+/* ===== Сброс и основа ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body,
+h1,
+h2,
+p,
+ul {
+  margin: 0;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-body);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  /* Виньетка по краям и слабое багровое зарево сверху */
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(139, 30, 30, 0.18), transparent 70%),
+    radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.6) 100%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--color-blood);
+  color: var(--color-text);
+}
+
+/* Общий контейнер: ограничивает ширину строки, чтобы текст читался */
+.container {
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 0 var(--space);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space);
+  flex: 1;
+}
+
+/* ===== Шапка ===== */
+.header {
+  padding: 3.5rem var(--space) 2.5rem;
+  text-align: center;
+}
+
+.header__overline {
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+
+.header__title {
+  margin: 0.5rem 0 0.75rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.4rem, 8vw, 4.25rem);
+  line-height: 1.1;
+  color: var(--color-text);
+  text-shadow: 0 0 1.5rem rgba(139, 30, 30, 0.55);
+}
+
+.header__subtitle {
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--color-muted);
+}
+
+/* Орнамент-разделитель под шапкой: линия — знак — линия */
+.header::after {
+  content: '';
+  display: block;
+  width: min(20rem, 70%);
+  height: 1px;
+  margin: 2rem auto 0;
+  background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+}
+
+/* ===== Панели (форма и управление) ===== */
+.panel {
+  position: relative;
+  padding: var(--space);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  /* Вторая, внутренняя рамка — как тиснение на переплёте */
+  box-shadow:
+    inset 0 0 0 4px var(--color-panel),
+    inset 0 0 0 5px rgba(184, 148, 90, 0.18),
+    0 1rem 2rem rgba(0, 0, 0, 0.4);
+}
+
+.panel__title {
+  margin-bottom: 1rem;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.6rem;
+  color: var(--color-gold-bright);
+}
+
+/* ===== Поля ===== */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0; /* чтобы поле могло сжиматься внутри grid */
+}
+
+.field__label {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.field__input {
+  width: 100%;
+  height: 2.75rem; /* одинаковая высота у текстовых полей, даты и списков */
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-field);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color-scheme: dark; /* тёмный календарь у поля даты */
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.field__input::placeholder {
+  color: #7d7064;
+  font-style: italic;
+}
+
+.field__input:hover {
+  border-color: #5a4836;
+}
+
+.field__input:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(184, 148, 90, 0.25);
+}
+
+/* Свой треугольник у выпадающего списка вместо системного */
+select.field__input {
+  appearance: none;
+  padding-right: 2.25rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23b8945a' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+}
+
+/* ===== Кнопки ===== */
+.button {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.button--primary {
+  color: var(--color-text);
+  background: var(--color-blood);
+  border-color: #5e1414;
+}
+
+.button--primary:hover {
+  background: var(--color-blood-hover);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
+/* ===== Форма новой записи ===== */
+/* Десктоп: название | срок | кнопка — в одну строку */
+.task-form {
+  display: grid;
+  grid-template-columns: 1fr 11rem auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+/* ===== Панель поиска, фильтра и сортировки ===== */
+.panel--controls {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+/* ===== Список записей ===== */
+.chronicle {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 3rem;
+}
+
+.chronicle__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chronicle__title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.9rem;
+  color: var(--color-gold-bright);
+}
+
+.chronicle__counter {
+  font-style: italic;
+  color: var(--color-muted);
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.chronicle__empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-size: 1.35rem;
+  color: var(--color-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* Атрибут hidden должен побеждать display из классов выше */
+[hidden] {
+  display: none !important;
+}
+
+/* ===== Подвал ===== */
+.footer {
+  padding: 1.5rem var(--space) 2rem;
+  text-align: center;
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--color-muted);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ===== Адаптив ===== */
+
+/* Планшет: название на всю ширину, срок и кнопка — строкой ниже */
+@media (max-width: 720px) {
+  :root {
+    --space: 1.25rem;
+  }
+
+  .task-form {
+    grid-template-columns: 1fr auto;
+  }
+
+  .task-form .field:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .panel--controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .panel--controls .field:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Телефон: всё в одну колонку, кнопка во всю ширину под палец */
+@media (max-width: 480px) {
+  :root {
+    --space: 1rem;
+  }
+
+  .page {
+    font-size: 1.05rem;
+  }
+
+  .header {
+    padding-top: 2.5rem;
+  }
+
+  .task-form,
+  .panel--controls {
+    grid-template-columns: 1fr;
+  }
+
+  .chronicle__head {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+/* Для тех, у кого в системе отключена анимация */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

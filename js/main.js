@@ -55,6 +55,29 @@ function connectStyles() {
   document.head.append(stylesheet);
 }
 
+// Шрифты Google Fonts — тоже через <link>, тоже из JS.
+// preconnect заранее открывает соединение с серверами шрифтов,
+// чтобы текст не «прыгал» долго при загрузке.
+function connectFonts() {
+  const fontsUrl = 'https://fonts.googleapis.com/css2'
+    + '?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500'
+    + '&family=EB+Garamond:ital,wght@0,400;0,500;1,400'
+    + '&family=Ruslan+Display'
+    + '&display=swap';
+
+  document.head.append(
+    createElement('link', {
+      attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+    }),
+    createElement('link', {
+      attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+    }),
+    createElement('link', {
+      attrs: { rel: 'stylesheet', href: fontsUrl },
+    }),
+  );
+}
+
 // ===== Части страницы =====
 
 function buildHeader() {
@@ -216,6 +239,7 @@ function buildFooter() {
 // ===== Запуск =====
 
 function init() {
+  connectFonts();
   connectStyles();
 
   document.body.className = 'page';
